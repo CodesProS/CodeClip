@@ -54,6 +54,17 @@ export default function CodeEditor({
           >
             Next match
           </button>
+          <button
+            type="button"
+            className="button button--small"
+            onClick={() => {
+              textarea.current.focus();
+              textarea.current.select();
+            }}
+            disabled={!code}
+          >
+            Select all code
+          </button>
           <span className="hint" role="status">
             {result}
           </span>
