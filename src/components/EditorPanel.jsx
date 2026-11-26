@@ -1,15 +1,59 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import CodeEditor from "./CodeEditor";
-import { downloadFile } from "../lib/project";
+import TerminalPanel from "./TerminalPanel";
+import useCodeRunner from "../hooks/useCodeRunner";
+import { downloadFile, EXTENSIONS } from "../lib/project";
+import { emptyHistory, recordEdit, redoEdit, undoEdit } from "../lib/editor";
 
 export default function EditorPanel({
   file,
+  files,
+  onSelect,
   settings,
   onChange,
-  onSettings,
   notify,
 }) {
   const [copying, setCopying] = useState(false);
+  const [cursorState, setCursorState] = useState(null);
+  const runRef = useRef(null);
+  const histories = useRef(new Map());
+  const [, setHistoryVersion] = useState(0);
+  const runner = useCodeRunner();
+  const history = (file && histories.current.get(file.id)) || emptyHistory();
+  const cursor =
+    cursorState?.fileId === file?.id ? cursorState : { line: 1, column: 1 };
+
+  function saveHistory(next) {
+    histories.current.set(file.id, next);
+    setHistoryVersion((value) => value + 1);
+  }
+  function edit(code) {
+    saveHistory(recordEdit(history, file.code));
+    onChange(code);
+  }
+  function step(direction) {
+    const result = (direction === "undo" ? undoEdit : redoEdit)(
+      history,
+      file.code,
+    );
+    if (!result) return;
+    saveHistory(result.history);
+    onChange(result.code);
+  }
+  function handleKeys(event) {
+    const mod = event.ctrlKey || event.metaKey;
+    const key = event.key.toLowerCase();
+    if (mod && key === "enter") {
+      event.preventDefault();
+      runRef.current?.();
+    } else if (mod && key === "z") {
+      event.preventDefault();
+      step(event.shiftKey ? "redo" : "undo");
+    } else if (mod && key === "y") {
+      event.preventDefault();
+      step("redo");
+    }
+  }
   async function copy() {
     setCopying(true);
     try {
@@ -21,53 +65,81 @@ export default function EditorPanel({
       setCopying(false);
     }
   }
+
   return (
     <section className="editor-panel" aria-label="File editor">
-      <div className="section-bar">
-        <div>
-          <strong>Code editor</strong>
-          <span>{file?.name || "No file selected"}</span>
-        </div>
-        <button className="text-button" onClick={onSettings}>
-          Editor settings
-        </button>
+      <div className="file-tabs" aria-label="Open files">
+        {files.map((item) => (
+          <button
+            key={item.id}
+            className="file-tab"
+            aria-current={item.id === file?.id ? "true" : undefined}
+            onClick={() => onSelect(item.id)}
+          >
+            <span className="file-icon">{EXTENSIONS[item.language]}</span>
+            {item.name}
+          </button>
+        ))}
       </div>
       {file ? (
         <>
-          <div className="editor-actions">
-            <span className="language-badge">{file.language}</span>
-            <button
-              className="button button--small"
-              disabled={copying}
-              onClick={copy}
-            >
-              Copy code
-            </button>
-            <button
-              className="button button--small"
-              onClick={() => {
-                downloadFile(file);
-                notify(`Download started: ${file.name}`);
-              }}
-            >
-              Download file
-            </button>
+          <div className="editor-body">
+            <CodeEditor
+              key={file.id}
+              code={file.code}
+              onChange={edit}
+              onCursor={(position) =>
+                setCursorState({ ...position, fileId: file.id })
+              }
+              onKeyDown={handleKeys}
+              fontSize={settings.fontSize}
+              wordWrap={settings.wordWrap}
+              label={`Code editor: ${file.name}`}
+              searchable
+              actions={({ selectAll }) => (
+                <div className="tool-group" aria-label="Editor actions">
+                  <button
+                    onClick={() => step("undo")}
+                    disabled={!history.past.length}
+                    title="Undo (Ctrl+Z)"
+                  >
+                    Undo
+                  </button>
+                  <button
+                    onClick={() => step("redo")}
+                    disabled={!history.future.length}
+                    title="Redo (Ctrl+Shift+Z)"
+                  >
+                    Redo
+                  </button>
+                  <button onClick={selectAll} disabled={!file.code}>
+                    Select all
+                  </button>
+                  <button disabled={copying} onClick={copy}>
+                    Copy
+                  </button>
+                  <button
+                    title={`Download ${file.name}`}
+                    onClick={() => {
+                      downloadFile(file);
+                      notify(`Download started: ${file.name}`);
+                    }}
+                  >
+                    Download
+                  </button>
+                </div>
+              )}
+            />
+            <footer className="editor-footer">
+              <span>
+                {file.language} · {file.code.split("\n").length} lines
+              </span>
+              <span>
+                Ln {cursor.line}, Col {cursor.column} · UTF-8
+              </span>
+            </footer>
           </div>
-          <CodeEditor
-            key={file.id}
-            code={file.code}
-            onChange={onChange}
-            fontSize={settings.fontSize}
-            wordWrap={settings.wordWrap}
-            searchable
-          />
-          <footer className="editor-footer">
-            <span>
-              {file.code.split("\n").length} lines · {file.code.length}{" "}
-              characters
-            </span>
-            <span>UTF-8 · Plain text</span>
-          </footer>
+          <TerminalPanel file={file} runner={runner} runRef={runRef} />
         </>
       ) : (
         <div className="empty-state">

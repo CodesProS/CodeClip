@@ -11,13 +11,11 @@ import {
   unusedFilename,
   validateName,
 } from "../lib/project";
-import { downloadProject } from "../lib/download";
 
 export default function Workspace({
   project,
   updateProject,
   settings,
-  onSettings,
   saveStatus,
   notify,
 }) {
@@ -26,7 +24,6 @@ export default function Workspace({
   const [name, setName] = useState("");
   const [language, setLanguage] = useState(project.language);
   const [error, setError] = useState("");
-  const [exporting, setExporting] = useState(false);
   const file =
     project.files.find((item) => item.id === project.selectedFileId) || null;
   const target = project.files.find((item) => item.id === fileDialog?.id);
@@ -133,43 +130,17 @@ export default function Workspace({
     );
   }
 
-  async function exportZip() {
-    setExporting(true);
-    try {
-      await downloadProject(project);
-      notify("Project ZIP download started.");
-    } catch (problem) {
-      notify(
-        problem.message ||
-          "ZIP download failed. Try downloading individual files.",
-      );
-    } finally {
-      setExporting(false);
-    }
-  }
-
   return (
     <main id="main" tabIndex={-1} className="workspace">
-      <div className="workspace-toolbar">
-        <div>
-          <a href="#projects" className="text-button">
-            ← All projects
-          </a>
-          <h1>{project.name}</h1>
-          <p className="hint" role="status">
-            {saveStatus}
-          </p>
-        </div>
-        <button
-          className="button button--primary"
-          disabled={!project.files.length || exporting}
-          onClick={exportZip}
-        >
-          {exporting ? "Preparing ZIP…" : "Download project ZIP"}
-        </button>
-      </div>
       <div className="workspace-grid">
         <aside className="file-panel" aria-label="Project files">
+          <div className="project-block">
+            <span className="eyebrow">Project</span>
+            <h1>{project.name}</h1>
+            <p className="hint" role="status">
+              {saveStatus}
+            </p>
+          </div>
           <div className="files-heading">
             <h2>
               Files <span className="hint">{project.files.length}</span>
@@ -222,6 +193,8 @@ export default function Workspace({
         <CapturePanel project={project} onReview={setCapture} />
         <EditorPanel
           file={file}
+          files={project.files}
+          onSelect={(id) => update(() => ({ selectedFileId: id }), false)}
           settings={settings}
           onChange={(code) =>
             update((current) => ({
@@ -230,7 +203,6 @@ export default function Workspace({
               ),
             }))
           }
-          onSettings={onSettings}
           notify={notify}
         />
       </div>

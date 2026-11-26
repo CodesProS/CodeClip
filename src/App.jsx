@@ -6,6 +6,7 @@ import ProjectDialog from "./components/ProjectDialog";
 import useProjects from "./hooks/useProjects";
 import { createProject, makeId, validateName } from "./lib/project";
 import { loadSettings, SETTINGS_KEY } from "./lib/storage";
+import { downloadProject } from "./lib/download";
 
 function currentProjectId() {
   try {
@@ -25,6 +26,7 @@ export default function App() {
   const [settings, setSettings] = useState(loadSettings);
   const [settingsError, setSettingsError] = useState("");
   const [message, setMessage] = useState("");
+  const [exporting, setExporting] = useState(false);
   const toastTimer = useRef(null);
   const project = projects.find((item) => item.id === activeId);
 
@@ -54,6 +56,20 @@ export default function App() {
     clearTimeout(toastTimer.current);
     setMessage(text);
     toastTimer.current = setTimeout(() => setMessage(""), 4500);
+  }
+  async function exportZip() {
+    setExporting(true);
+    try {
+      await downloadProject(project);
+      notify("Project ZIP download started.");
+    } catch (problem) {
+      notify(
+        problem.message ||
+          "ZIP download failed. Try downloading individual files.",
+      );
+    } finally {
+      setExporting(false);
+    }
   }
   function saveProject(name, language) {
     if (dialog.project) {
@@ -102,15 +118,39 @@ export default function App() {
         Skip to content
       </a>
       <header className="topbar">
-        <a className="brand" href="#projects">
-          <span className="brand__mark" aria-hidden="true">
-            &lt;/&gt;
-          </span>
-          <strong>CodeClip</strong>
-        </a>
-        <div className="top-actions">
+        <div className="topbar__start">
+          {activeId && (
+            <a className="top-back" href="#projects">
+              <span aria-hidden="true">←</span> Back to Projects
+            </a>
+          )}
+          <a className="brand" href="#projects">
+            <span className="brand__mark" aria-hidden="true">
+              &lt;/&gt;
+            </span>
+            <strong>CodeClip</strong>
+          </a>
+        </div>
+        <nav className="top-actions" aria-label="App actions">
           <button
-            className="theme-toggle"
+            className="top-button"
+            onClick={() => setDialog({ type: "settings" })}
+          >
+            Settings
+          </button>
+          {project && (
+            <button
+              className="top-button top-button--primary"
+              disabled={!project.files.length || exporting}
+              onClick={exportZip}
+              title="Download every file in this project as a ZIP"
+            >
+              {exporting ? "Preparing…" : "Download"}
+            </button>
+          )}
+          <button
+            className="top-button"
+            aria-label={`Switch to ${settings.theme === "light" ? "dark" : "light"} mode`}
             onClick={() =>
               setSettings((current) => ({
                 ...current,
@@ -118,15 +158,24 @@ export default function App() {
               }))
             }
           >
-            {settings.theme === "light" ? "◐ Dark mode" : "☼ Light mode"}
+            <span className="top-button__icon" aria-hidden="true">
+              {settings.theme === "light" ? "☾" : "☼"}
+            </span>
+            Light / Dark
           </button>
           <button
-            className="guide-button"
+            className="top-button"
             onClick={() => setDialog({ type: "guide" })}
           >
-            How it works
+            <span
+              className="top-button__icon top-button__icon--round"
+              aria-hidden="true"
+            >
+              ?
+            </span>
+            Demo Guide
           </button>
-        </div>
+        </nav>
       </header>
       {(saveError || settingsError) && (
         <div className="save-warning" role="alert">
@@ -139,7 +188,6 @@ export default function App() {
           project={project}
           updateProject={updateProject}
           settings={settings}
-          onSettings={() => setDialog({ type: "settings" })}
           saveStatus={saveStatus}
           notify={notify}
         />
@@ -192,7 +240,7 @@ export default function App() {
         </Dialog>
       )}
       {dialog?.type === "settings" && (
-        <Dialog title="Editor settings" onClose={() => setDialog(null)}>
+        <Dialog title="Settings" onClose={() => setDialog(null)}>
           <div className="modal__body stack">
             <label className="field">
               Font size
@@ -258,12 +306,19 @@ export default function App() {
                 Edit, copy, and download files, or download the whole project as
                 a ZIP.
               </li>
+              <li>
+                Run JavaScript or Python files from the Run Code panel. Add
+                program input if your code reads from <code>input()</code> or{" "}
+                <code>prompt()</code>.
+              </li>
             </ol>
             <p className="hint">
               This milestone uses preset sample extraction and manual
               transcription. AI vision and direct webpage capture are still
-              planned. Code is stored locally in this browser; clearing site
-              data removes it. Image previews are not saved.
+              planned. Code runs in your browser; Python downloads its runtime
+              the first time. Java, C, and C++ cannot run yet. Code is stored
+              locally in this browser; clearing site data removes it. Image
+              previews are not saved.
             </p>
           </div>
           <footer className="modal__footer">

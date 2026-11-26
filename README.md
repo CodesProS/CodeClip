@@ -25,6 +25,8 @@ Open the local URL printed by Vite. On Windows PowerShell, use `npm.cmd` if `npm
 - Detect exact overlapping lines at the boundary of two captures.
 - Reopen saved captures from project history.
 - Copy code, download individual source files, and download a project ZIP.
+- Switch files with editor tabs, find text, undo/redo edits, and see the cursor line and column.
+- Run JavaScript and Python files in the browser from the Run Code panel, with program input, a stop button, and a 15-second limit. Python uses Pyodide, which is downloaded from jsDelivr on the first run. Java, C, and C++ cannot run yet.
 - Save projects locally in the browser.
 - Use light/dark themes, editor preferences, and responsive layouts.
 
