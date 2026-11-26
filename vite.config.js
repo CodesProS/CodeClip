@@ -7,4 +7,6 @@ export default defineConfig(({ command }) => ({
   // so production builds need that sub-path. Local dev stays at '/'.
   base: command === "build" ? "/CodeClip/" : "/",
   plugins: [react()],
+  // The code runner is a module worker that lazily imports the Python runtime.
+  worker: { format: "es" },
 }));

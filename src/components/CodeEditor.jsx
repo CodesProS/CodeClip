@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { cursorPosition } from "../lib/editor";
 
 export default function CodeEditor({
   code,
@@ -7,11 +8,21 @@ export default function CodeEditor({
   wordWrap = false,
   label = "Code editor",
   searchable = false,
+  actions,
+  onCursor,
+  onKeyDown,
 }) {
   const textarea = useRef(null);
   const gutter = useRef(null);
   const [query, setQuery] = useState("");
   const [result, setResult] = useState("");
+  function reportCursor(input) {
+    onCursor?.(cursorPosition(input.value, input.selectionStart));
+  }
+  function selectAll() {
+    textarea.current.focus();
+    textarea.current.select();
+  }
   function findNext(event) {
     event.preventDefault();
     if (!query) return;
@@ -29,46 +40,41 @@ export default function CodeEditor({
       0,
       (code.slice(0, index).split("\n").length - 3) * fontSize * 1.6,
     );
-    setResult(`Match on line ${code.slice(0, index).split("\n").length}`);
+    reportCursor(input);
+    setResult(`Line ${code.slice(0, index).split("\n").length}`);
   }
   return (
     <div className="code-editor-wrap">
       {searchable && (
-        <form className="code-toolbar" onSubmit={findNext}>
-          <label className="find-label">
-            Find
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setResult("");
-              }}
-              placeholder="Search this file"
-            />
-          </label>
-          <button
-            type="submit"
-            className="button button--small"
-            disabled={!query}
-          >
-            Next match
-          </button>
-          <button
-            type="button"
-            className="button button--small"
-            onClick={() => {
-              textarea.current.focus();
-              textarea.current.select();
-            }}
-            disabled={!code}
-          >
-            Select all code
-          </button>
-          <span className="hint" role="status">
-            {result}
-          </span>
-        </form>
+        <div className="code-toolbar">
+          <form className="find-form" onSubmit={findNext} role="search">
+            <label className="find-field">
+              <span>Find</span>
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setResult("");
+                }}
+                placeholder="Search in code"
+              />
+            </label>
+            <button
+              type="submit"
+              className="find-next"
+              disabled={!query}
+              aria-label="Find next match"
+              title="Find next (Enter)"
+            >
+              ↵
+            </button>
+            <span className="find-result" role="status">
+              {result}
+            </span>
+          </form>
+          {actions?.({ selectAll })}
+        </div>
       )}
       <div className="code-editor" style={{ fontSize }}>
         {!wordWrap && (
@@ -86,6 +92,8 @@ export default function CodeEditor({
             onChange(event.target.value);
             setResult("");
           }}
+          onSelect={(event) => reportCursor(event.target)}
+          onKeyDown={onKeyDown}
           wrap={wordWrap ? "soft" : "off"}
           spellCheck={false}
           autoCapitalize="off"
